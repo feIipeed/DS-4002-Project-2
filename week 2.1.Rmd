@@ -1,0 +1,261 @@
+---
+title: ""
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE)
+```
+
+```{r, include=FALSE, echo=FALSE, warning=FALSE, message=FALSE}
+# Loading in Data
+#Loading in Libraries
+library(psych)
+library(ggplot2)
+library(glmnet)
+library(tree)
+library(nnet)
+library(caret)
+library(yardstick)
+
+city = read.csv("5city.csv")
+city5 = read.csv("5city.csv")
+
+#Getting rid of NA value for response variables
+city = city[-320,]
+
+#Filtering for only data that is percentages (counts aren't helpful and don't normalize for population)
+normalized_data = city[,c(10,11,17,19:28)]
+normalized_data$risk_category = cut(city$cases_per_1000, breaks=c(0,15.5,23 , 100), right = FALSE, labels = c(1,2,3))
+```
+
+
+# EDA {.tabset}
+
+## Correlation Coefficients
+```{r, echo=FALSE}
+pairs.panels(normalized_data[,c(13,1:6)])
+pairs.panels(normalized_data[,c(13,6:12)])
+```
+
+We can see by looking at the scatter plots and correlation coefficients that zip code, average household size, percent with more than one occupant per room, percent minority and city have the greatest correlation coefficiets with cases per 1000.
+
+
+## Testing and Training Data
+70-30 Split
+```{r}
+set.seed(2123)
+n <- nrow(normalized_data)
+sample_size <- floor(0.70 * n)
+training_indices <- sample(1:n, size = sample_size, replace = FALSE)
+training_data <- normalized_data[training_indices, ]
+testing_data  <- normalized_data[-training_indices, ]
+training_data$risk_category = as.factor(training_data$risk_category)
+```
+
+
+## Target Variables
+```{r, echo=FALSE}
+ggplot(city, aes(cases_per_1000)) + geom_histogram(color = "darkblue", fill = "lightblue")+
+  labs(title="Cases per 1000 Distribution",
+       x="Cases per 1000") + 
+      theme(plot.title=element_text(hjust = 0.5))
+
+ggplot(city, aes(cases)) + geom_histogram(color = "darkblue", fill = "lightblue")+
+  labs(title="Cases",
+       x="Cases") + 
+      theme(plot.title=element_text(hjust = 0.5))
+```
+
+While both target variables are skewed, cases has a greater skew than cases per thousand. Cases per thousand accounts for population and will be used for all regression except the poisson regression.
+
+
+```{r, echo=FALSE}
+city5$city_numeric <- as.numeric(factor(city5$city, levels = c("nyc", "balt", "det", "chi", "phi")))
+
+city5$city_numeric = factor(city5$city_numeric,
+                                 labels=c("NY", "BALT", "CHI", "DET", "PHI"))
+
+ggplot(city5,aes(x=city_numeric,y=cases_per_1000, fill=city_numeric)) +
+  geom_boxplot(outlier.size=2) +
+  labs(title="Boxplot of COVID-19 cases/1000 and City",
+       x="City", y="Number of Cases per 1000") +
+    theme(plot.title=element_text(hjust = 0.5))
+```
+
+When looking at the boxplots of cases per thousand grouped by city, we can see that both the medians and ranges vary greatly. NYC has the greatest median and range while Baltimore has the smallest range and median.
+
+
+
+
+# Models {.tabset}
+## LASSO Regression
+NRMSE: 
+```{r, echo=FALSE}
+training_data_numeric = training_data[,c(1:13)]
+training_data_numeric = as.matrix(na.omit(training_data_numeric))
+
+testing_data_numeric = testing_data[,c(1:13)]
+testing_data_numeric = as.matrix(na.omit(testing_data_numeric))
+
+lasso_model <- cv.glmnet(training_data_numeric[,-13], training_data_numeric[,13], alpha = 1)
+
+
+best_lambda <- lasso_model$lambda.min
+lasso_pred <- predict(lasso_model, s = best_lambda, newx = testing_data_numeric[,c(1:12)])
+
+#NRMSE For Model
+sqrt(mean((lasso_pred - testing_data_numeric[,13])^2)) / sd(testing_data_numeric[,13])
+```
+
+The first regression we did was **LASSO** which stands for **l**east **a**bsolute **s**hrinkage and **s**election **o**perator. The goal of this regression is to minimize sum of square residuals while also penalizing the magnitidue of regression coefficients. The normalized root mean square error for this model was very poor indicating that it should not be used for prediction.
+
+
+
+
+## Ridge Regression
+NRMSE: 
+```{r, echo=FALSE}
+ridge_model <- cv.glmnet(training_data_numeric[,-13], training_data_numeric[,13], alpha = 0)
+
+best_lambda <- ridge_model$lambda.min
+ridge_pred <- predict(ridge_model, s = best_lambda, newx = testing_data_numeric[,-13])
+
+#NRMSE For Model
+sqrt(mean((ridge_pred - testing_data_numeric[,13])^2)) / sd(testing_data_numeric[,13])
+```
+
+The second regression we performed was Ridge regression and addresses the *issue of multicolinearity* and *prevents overfitting*. The normalized root mean square error for this model was very poor indicating that it should not be used for prediction. 
+
+
+
+
+## Poisson Model
+```{r, echo=FALSE}
+library(VGAM)
+m0.pr <- vglm(training_data_numeric[,13] ~ training_data_numeric[,-c(10,13)],
+              family = poissonff(),model = TRUE)
+
+poisson_predictions = predictvglm(m0.pr, newx = testing_data_numeric[,-c(10,13)], type = "response")
+summary(m0.pr)
+```
+
+
+
+
+## Linear Model
+```{r, include=FALSE}
+training_linear = training_data[,-14]
+testing_linear = testing_data[,-14]
+linearmodel = lm(training_linear$cases_per_1000 ~. , data = training_linear)
+
+step_model = step(linearmodel)
+```
+
+```{r, echo=FALSE}
+summary(step_model)
+
+```
+
+NRMSE: 
+```{r, echo=FALSE}
+yhat = predict(step_model, newdata = testing_linear, type = "response")
+sqrt(mean((yhat - testing_linear$cases_per_1000)^2)) / sd(testing_linear$cases_per_1000)
+```
+
+
+The backwards step regression of linear model has an *adjusted R-squared* of **0.5346** and an *NRMSE* of **0.5967**. The r-squared is alright however the NRMSE value is poor and therefore the model should not be used for prediction.
+
+
+After not having much success and meeting the thresholds we wanted for the regression models we decided to **bin** the target variables into low, middle and high risk to see if we were able build a model that could predict these ranges. We decided to to try both a decision tree and multinomial method.
+
+
+
+
+## Decision Tree:
+```{r, echo=FALSE}
+library(tree)
+
+
+tree <- tree(training_data$risk_category~. -cases_per_1000, data = training_data)
+plot(tree)
+text(tree, cex=0.7)
+
+yhat = predict(tree, newdata = testing_data, type = "class")
+
+sum(yhat == testing_data$risk_category)/108
+```
+
+```{r, echo=FALSE}
+conf_matrix <- confusionMatrix(factor(yhat), factor(testing_data$risk_category))
+print(conf_matrix)
+```
+
+The accuracy for the decision tree model was **0.6759** with a confidence interval of (0.5791, 0.7628) at the **95%** confidence level.
+
+
+
+
+## General Linear Model:
+```{r, include=FALSE, echo=FALSE, warning=FALSE, message=FALSE}
+#install.packages("glm")
+#install.packages("nnet")
+library(nnet)
+
+training_data$risk_category = as.factor(training_data$risk_category)
+
+model <- multinom(risk_category ~average_household_size + pct_more_than_one_occupant_per_room + median_age + pct_below_poverty_level + household_median_income + pct_services +  pct_over_age_65 + pct_white + pct_minority + pct_black + pct_hispanic, data = training_data)
+
+colnames(training_data)
+```
+
+```{r, echo=FALSE}
+summary(model)
+
+yhat = predict(model, newdata = testing_data, type = "class")
+
+sum(yhat == testing_data$risk_category)/108
+```
+
+
+### Confusion Matrix + Statistics
+```{r, echo=FALSE}
+library(caret)
+library(yardstick)
+conf_matrix <- confusionMatrix(factor(yhat), factor(testing_data$risk_category))
+print(conf_matrix)
+```
+
+We found the accuracy for the multinomial model to be about 76% with a 95% confidence interval ranging from 0.6675 to 0.8363. This is our best model and the model we chose to go with. We can also see that the class sensitivity is much higher for Class 1 compared to class 2 and 3. We can see that the specificity is also high for class 2 and class 3, while this is important, in the healthcare division it is always better to have false positives than false negatives.
+
+
+
+
+# Hypothetical Function
+```{r}
+prediction_row = testing_data[18,]
+
+prediction_from_lm = function(model,data){
+  data = as.data.frame(data)
+  prediction = predict(model, newdata = data, type = "class")
+  if (prediction == 1){
+    print("Low Infection Rate Predicted")
+  }
+  if (prediction == 2){
+    print("Medium Infection Rate Predicted")
+  }
+  if (prediction ==3){
+    print("High Infection Rate Predicted")
+  }
+}
+
+prediction_from_lm(model,prediction_row)
+```
+
+
+
+# Next Steps:
+
+Going forward, we hope to focus on more models that predict the category of risk in order to find a model with higher accuracy and better precision including variables selection within these risk category models. We would like to expand the data set to be able to look at rural areas and risks within there as well. We plan on focusing more on errors where the model has "under predicted" the risk category since this is looking at health and infection data and it is important we are ensuring that all areas have more resources than needed compared to not having enough areas. Going forward we also hope to look at more demographic data such as education status or past medical history. 
+
+

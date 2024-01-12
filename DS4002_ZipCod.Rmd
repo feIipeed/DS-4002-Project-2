@@ -1,0 +1,111 @@
+---
+title: "ZIP CODE DS 4002" 
+author: "Clarissa Kusmana"
+fontsize: 12pt
+geometry: margin=1in
+urlcolor: black
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, highlight=FALSE,
+                      warning = FALSE, message = FALSE)
+```
+
+## Zip Map NYC
+```{r, results="hide"}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+
+nyc_zip_codes <- st_read("C:/Users/cakus/Downloads/Modified Zip Code Tabulation Areas (MODZCTA)_20240110/geo_export_fa9858c6-1abc-45c1-8bf0-cac44aca1a77.shp")
+head(nyc_zip_codes)
+
+nyc5 = read.csv('C:/Users/cakus/Downloads/nyc_zips.csv')
+nyc5 <- na.omit(nyc5)
+head(nyc5)
+
+merged_data_ny <- merge(nyc_zip_codes, nyc5, by.x = "modzcta", by.y = "ZIPCODE", all = TRUE)
+head(merged_data_ny)
+
+ggplot() +
+  geom_sf(data = merged_data_ny, aes(fill = cases_per_1000)) +
+  scale_fill_viridis_c() +
+  labs(title = "Cases/1000 by Zip Code in New York City")
+```
+
+## Zip Map BALTIMORE
+```{r, results="hide"}
+
+balt_zip_codes <- st_read("C:/Users/cakus/Downloads/Zip_Codes/Zip_Codes.shp")
+head(balt_zip_codes)
+
+balt5 = read.csv('C:/Users/cakus/Downloads/balt_zips.csv')
+balt5 <- na.omit(balt5)
+head(balt5)
+
+merged_data_balt <- merge(balt_zip_codes, balt5, by.x = "zipcode1", by.y = "ZIPCODE1", all = TRUE)
+head(merged_data_balt)
+
+ggplot() +
+  geom_sf(data = merged_data_balt, aes(fill = cases_per_1000)) +
+  scale_fill_viridis_c() +
+  labs(title = "Cases/1000 by Zip Code in Baltimore")
+
+```
+
+## Zip Map CHICAGO
+```{r, results="hide"}
+chi_zip_codes <- st_read("C:/Users/cakus/Downloads/Boundaries - ZIP Codes/geo_export_a87a682f-0fb7-42fc-b3c0-a488853b203f.shp")
+head(chi_zip_codes)
+
+chi5 = read.csv('C:/Users/cakus/Downloads/chi_zips.csv')
+chi5 <- na.omit(chi5)
+head(chi5)
+
+merged_data_chi <- merge(chi_zip_codes, chi5, by.x = "zip", by.y = "zip", all = TRUE)
+head(merged_data_chi)
+
+ggplot() +
+  geom_sf(data = merged_data_chi, aes(fill = cases_per_1000)) +
+  scale_fill_viridis_c() +
+  labs(title = "Cases/1000 by Zip Code in Chicago")
+```
+
+## Zip Map PHIL
+```{r, results="hide"}
+phi_zip_codes <- st_read("C:/Users/cakus/Downloads/PhillyStreets_Zipcodes_Poly/PhillyStreets_Zipcodes_Poly.shp")
+head(phi_zip_codes)
+
+phi5 = read.csv('C:/Users/cakus/Downloads/phi_zips.csv')
+phi5 <- na.omit(phi5)
+head(phi5)
+
+merged_data_phi <- merge(phi_zip_codes, phi5, by.x = "CODE", by.y = "ZIP_CODE", all = TRUE)
+head(merged_data_phi)
+
+ggplot() +
+  geom_sf(data = merged_data_phi, aes(fill = cases_per_1000)) +
+  scale_fill_viridis_c() +
+  labs(title = "Cases/1000 by Zip Code in Philadelphia")
+
+```
+
+## Zip Map Detroit
+```{r, results="hide"}
+det_zip_codes <- st_read("C:/Users/cakus/Downloads/City_of_Detroit_Zip_Codes/zip_codes.shp")
+head(det_zip_codes)
+
+det5 = read.csv('C:/Users/cakus/Downloads/det_zips.csv')
+det5 <- na.omit(det5)
+head(det5)
+
+merged_data_det <- merge(det_zip_codes, det5, by.x = "zipcode", by.y = "zipcode", all = TRUE)
+head(merged_data_det)
+
+ggplot() +
+  geom_sf(data = merged_data_det, aes(fill = cases_per_1000)) +
+  scale_fill_viridis_c() +
+  labs(title = "Cases/1000 by Zip Code in Detroit")
+
+```

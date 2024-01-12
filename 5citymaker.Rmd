@@ -1,0 +1,86 @@
+---
+title: "5citymaker"
+author: "felipe"
+date: "2024-01-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+nyc=read.csv("nyc_zips.csv")
+balt=read.csv("balt_zips.csv")
+chi=read.csv("chi_zips.csv")
+det=read.csv("det_zips.csv")
+phi=read.csv("phi_zips.csv")
+```
+
+```{r}
+# add city variable to differentiate the cities
+nyc$city <- "nyc"
+balt$city <- "balt"
+chi$city <- "chi"
+det$city <- "det"
+phi$city <- "phi"
+
+# make all the columns match among the city df's
+nycdat = select(nyc,-ZIPCODE,-BLDGZIP,-PO_NAME,-POPULATION,-AREA,-STATE,-COUNTY,-ST_FIPS,-CTY_FIPS,-URL,-SHAPE_AREA,-SHAPE_LEN,-MODZCTA,-zcta_cum.perc_pos,-Total)
+baltdat = select(balt,-OBJECTID,-ZIPCODE1,-ZIPCODE2,-ZIPNAME,-zipcode_SH,-zip_name)
+chidat = select(chi,-objectid,-shape_area,-shape_len,-zip,-total_tested)
+detdat = select(det,-objectid,-zipcode,-Shape__Area,-Shape__Length)
+phidat = select(phi,-OBJECTID,-ZIP_CODE,-PO_NAME,-Negative,-Probable,-Additional_Tracking,-Positive_Redacted,-Negative_Redacted,-Shape__Area,-Shape__Length)
+
+# MERGE 'EM
+allcity = bind_rows(nycdat,baltdat,chidat,detdat,phidat)
+
+# download it for group 7 <3
+write.csv(allcity,"5city.csv",row.names=FALSE)
+```
+
+```{r}
+# attempt 1 of extracting new census zip code data
+censusVA=read.csv("DECENNIALDHC2020.P1-Data.csv")
+
+# ACS data try 1
+acs=read.csv("5yrACS.csv")
+
+# ACS data try 3
+acs18=read.csv("acs18data.csv")
+
+# attempt 5
+library(httr)
+
+url <- "https://api.census.gov/data/2018/acs/acs5"
+variables <- "B01003_001E,B03001_001E,B03002_001E,B03002_002E,B03002_003E,B03002_004E,B03002_005E,B03002_006E,B03002_007E,B25003_001E,B25010_001E,B25018_001E,B25024_001E,B01002_001E,B17001_002E,B17001_003E,B17001_004E,B17001_005E,B19013_001E,B19083_001E,B19025_001E,B02001_003E,B02001_004E,B03002_008E"
+state_code <- "51"  # Virginia's state code
+
+response <- GET(
+  paste0(
+    url,
+    "?get=", URLencode(variables),
+    "&for=zip%20code%20tabulation%20area:*",
+    "&in=state:", state_code
+  )
+)
+
+try5 <- content(response, "text")
+
+# Convert the JSON-like string to a list
+try5_list <- jsonlite::fromJSON(try5)
+
+# Convert the list to a data frame
+try5_df <- as.data.frame(do.call(rbind, try5_list))
+
+# Set column names based on the first row
+colnames(try5_df) <- try5_df[1, ]
+
+# Remove the first row (it contains column names)
+try5_df <- try5_df[-1, ]
+
+# Convert numeric columns to numeric type
+try5_df[] <- lapply(try5_df, as.numeric)```

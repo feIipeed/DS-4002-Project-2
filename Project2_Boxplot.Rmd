@@ -1,0 +1,49 @@
+---
+title: "Project 2 boxplot" 
+author: "Clarissa Kusmana"
+fontsize: 12pt
+geometry: margin=1in
+urlcolor: black
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, highlight=FALSE,
+                      warning = FALSE, message = FALSE)
+```
+
+## PROJECT 2
+```{r, results="hide"}
+library(dplyr)
+library(ggplot2)
+
+city5 = read.csv('C:/Users/cakus/Downloads/5city.csv')
+city5 <- na.omit(city5)
+```
+
+## Boxplot of CASES/1000 & CITY
+```{r, results="hide"}
+
+city5$city_numeric <- as.numeric(factor(city5$city, levels = c("nyc", "balt", "det", "chi", "phi")))
+
+city5$city_numeric = factor(city5$city_numeric,
+                                 labels=c("NY", "BALT", "CHI", "DET", "PHI"))
+
+ggplot(city5,aes(x=city_numeric,y=cases_per_1000, fill=city_numeric)) +
+  geom_boxplot(outlier.size=2) +
+  labs(title="Boxplot of COVID-19 cases/1000 and City",
+       x="City", y="Number of Cases per 1000") +
+    theme(plot.title=element_text(hjust = 0.5))
+```
+
+## PERCENT OVER 65 vs CASES/1000 scatterplot
+```{r, results="hide"}
+ggplot(city5, aes(y=cases_per_1000, x=pct_over_age_65, color=city_numeric)) +
+  geom_point() +
+  labs(title="COVID-19 Cases per 1000 vs Percent Over 65, Grouped by City", 
+       y="Cases/1000",
+       x="Percent Over 65") + 
+      theme(plot.title=element_text(hjust = 0.5)) +
+  guides(col=guide_legend("City"))
+
+```
